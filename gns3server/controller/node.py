@@ -469,7 +469,8 @@ class Node:
                     raise aiohttp.web.HTTPConflict(text="IOU licence is not configured")
                 yield from self.post("/start", timeout=240, data={"iourc_content": licence})
             else:
-                yield from self.post("/start", data=data, timeout=240)
+                #yield from self.post("/start", data=data, timeout=240)
+                yield from self.post("/start", data=data, timeout=2400)
         except asyncio.TimeoutError:
             raise aiohttp.web.HTTPRequestTimeout(text="Timeout when starting {}".format(self._name))
 

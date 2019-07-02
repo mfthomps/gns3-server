@@ -42,6 +42,10 @@ from ..utils.asyncio import asyncio_ensure_future
 from .export_project import export_project
 from .import_project import import_project
 
+import sys
+sys.path.append('/home/mike/git/Labtainers/scripts/gns3')
+import labtainersGNS3
+
 import logging
 log = logging.getLogger(__name__)
 
@@ -974,9 +978,21 @@ class Project:
         Start all nodes
         """
         pool = Pool(concurrency=3)
+        labtainer_images = {}
         for node in self.nodes.values():
+            if node.node_type == 'docker':
+                image = node.properties['image']
+                log.info('node type %s %s' % (node.node_type, node.properties['image']))
+                if 'labtainer' in image:
+                    labtainer_images[image] = node.properties['container_id']
+
             pool.append(node.start)
         yield from pool.join()
+        log.info('start_all done')
+        if len(labtainer_images) > 0:
+           log.info('proj filename %s' % self._filename)
+           labtainersGNS3.labtainerTerms(labtainer_images, log)
+
 
     @asyncio.coroutine
     def stop_all(self):
@@ -984,9 +1000,25 @@ class Project:
         Stop all nodes
         """
         pool = Pool(concurrency=3)
+        zip_list = []
+        image = None
         for node in self.nodes.values():
+            if node.node_type == 'docker':
+                image = node.properties['image']
+                log.info('stop_all node type %s %s' % (node.node_type, node.properties['image']))
+                if 'labtainer' in image:
+                    container_id = node.properties['container_id']
+                    results_zip = labtainersGNS3.labtainerStop(image, container_id, log)
+                    zip_list.append(results_zip)
             pool.append(node.stop)
         yield from pool.join()
+        ''' image only used to get lab name '''
+        if len(zip_list) > 0:        
+            try:
+                labtainersGNS3.gatherZips(zip_list, image, log)
+            except:
+                log.error('stop_all labtainerGNS3.gatherZips failed')
+                exit(1)
 
     @asyncio.coroutine
     def suspend_all(self):

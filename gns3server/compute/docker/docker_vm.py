@@ -26,6 +26,7 @@ import shlex
 import aiohttp
 import subprocess
 import os
+import sys
 
 from gns3server.utils.asyncio.telnet_server import AsyncioTelnetServer
 from gns3server.utils.asyncio.raw_command_server import AsyncioRawCommandServer
@@ -48,7 +49,8 @@ from .docker_error import (
 import logging
 log = logging.getLogger(__name__)
 
-
+sys.path.append('/home/mike/git/Labtainers/scripts/gns3')
+import labtainersGNS3
 class DockerVM(BaseNode):
     """
     Docker container implementation.
@@ -286,7 +288,6 @@ class DockerVM(BaseNode):
     @asyncio.coroutine
     def create(self):
         """Creates the Docker container."""
-
         try:
             image_infos = yield from self._get_image_information()
         except DockerHttp404Error:
@@ -394,6 +395,7 @@ class DockerVM(BaseNode):
         """
         Destroy an recreate the container with the new settings
         """
+        log.debug("Docker container '%s' update", self.name)
         # We need to save the console and state and restore it
         console = self.console
         aux = self.aux
@@ -453,6 +455,9 @@ class DockerVM(BaseNode):
                 yield from self._start_aux()
 
         self._permissions_fixed = False
+
+        self.parameterize()
+
         self.status = "started"
         log.info("Docker container '{name}' [{image}] started listen for {console_type} on {console}".format(name=self._name,
                                                                                                              image=self._image,
@@ -1060,3 +1065,7 @@ class DockerVM(BaseNode):
         """
         yield from self.close()
         yield from super().delete()
+
+    def parameterize(self):
+        log.info('parameterize: name is %s image: %s' % (self.name, self._image))
+        labtainersGNS3.parameterizeOne(self._image, log)
