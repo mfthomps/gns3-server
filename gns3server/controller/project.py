@@ -43,7 +43,11 @@ from .export_project import export_project
 from .import_project import import_project
 
 import sys
-sys.path.append('/home/mike/git/Labtainers/scripts/gns3')
+labtainer_dir = os.getenv('LABTAINER_DIR')
+if labtainer_dir is None:
+    print('Must define LABTAINER_DIR environment variable')
+    exit(1)
+sys.path.append(os.path.join(labtainer_dir, 'scripts', 'gns3'))
 import labtainersGNS3
 
 import logging

@@ -48,8 +48,11 @@ from .docker_error import (
 
 import logging
 log = logging.getLogger(__name__)
-
-sys.path.append('/home/mike/git/Labtainers/scripts/gns3')
+labtainer_dir = os.getenv('LABTAINER_DIR')
+if labtainer_dir is None:
+    print('Must define LABTAINER_DIR environment variable')
+    exit(1)
+sys.path.append(os.path.join(labtainer_dir, 'scripts', 'gns3'))
 import labtainersGNS3
 class DockerVM(BaseNode):
     """
