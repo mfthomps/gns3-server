@@ -459,7 +459,8 @@ class DockerVM(BaseNode):
 
         self._permissions_fixed = False
 
-        self.parameterize()
+        if 'labtainer' in self._image:
+            self.parameterize()
 
         self.status = "started"
         log.info("Docker container '{name}' [{image}] started listen for {console_type} on {console}".format(name=self._name,
