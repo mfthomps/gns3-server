@@ -74,7 +74,7 @@ class DockerVM(BaseNode):
 
     def __init__(self, name, node_id, project, manager, image, console=None, aux=None, start_command=None,
                  adapters=None, environment=None, console_type="telnet", console_resolution="1024x768",
-                 console_http_port=80, console_http_path="/", extra_hosts=None):
+                 console_http_port=80, console_http_path="/", extra_hosts=None, container_id=None):
 
         super().__init__(name, node_id, project, manager, console=console, aux=aux, allocate_aux=True, console_type=console_type)
 
@@ -84,7 +84,7 @@ class DockerVM(BaseNode):
         self._image = image
         self._start_command = start_command
         self._environment = environment
-        self._cid = None
+        self._cid = container_id
         self._ethernet_adapters = []
         self._temporary_directory = None
         self._telnet_servers = []
@@ -210,7 +210,10 @@ class DockerVM(BaseNode):
         try:
             result = yield from self.manager.query("GET", "containers/{}/json".format(self._cid))
         except DockerError:
-            return "exited"
+            if 'labtainer' in self._image:
+                return "not_created"
+            else:
+                return "exited"
 
         if result["State"]["Paused"]:
             return "paused"
@@ -230,6 +233,7 @@ class DockerVM(BaseNode):
         """
         :returns: Return the path that we need to map to local folders
         """
+        log.debug('in _mount_binds for %s' % self._image)
         ressources = get_resource("compute/docker/resources")
         if not os.path.exists(ressources):
             raise DockerError("{} is missing can't start Docker containers".format(ressources))
@@ -242,6 +246,11 @@ class DockerVM(BaseNode):
             raise DockerError("Could not create network config in the container: {}".format(e))
         binds.append("{}:/gns3volumes/etc/network:rw".format(network_config))
 
+        if 'labtainer' in self._image:
+            log.debug('doing X11 binds for %s' % self._image)
+            #volume = volume+' --env="DISPLAY"  --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw"'
+            binds.append("/tmp/.X11-unix:/tmp/.X11-unix:rw")
+
         self._volumes = ["/etc/network"]
         volumes = image_infos.get("Config", {}).get("Volumes")
         if volumes is None:
@@ -251,7 +260,6 @@ class DockerVM(BaseNode):
             os.makedirs(source, exist_ok=True)
             binds.append("{}:/gns3volumes{}".format(source, volume))
             self._volumes.append(volume)
-
         return binds
 
     def _create_network_config(self):
@@ -290,6 +298,18 @@ class DockerVM(BaseNode):
 
     @asyncio.coroutine
     def create(self):
+        if 'labtainer' in self._image and self._cid is not None:
+            log.debug('create %s is labtainer' % self._image)
+            try:
+                state = yield from self._get_container_state()
+                if state != 'not_created':
+                    log.debug('create cid %s exists state %s, do not create' % (self._cid, str(state)))
+                    return
+                else:
+                    log.debug('create cid %s does not exist, create it' % self._cid)
+            except DockerHttp404Error:
+                log.debug('create cid %s does not exist, create it' % self._cid)
+                pass
         """Creates the Docker container."""
         try:
             image_infos = yield from self._get_image_information()
@@ -369,9 +389,13 @@ class DockerVM(BaseNode):
             if extra_hosts:
                 params["Env"].append("GNS3_EXTRA_HOSTS={}".format(extra_hosts))
 
+
+        if 'labtainer' in self._image:
+            params["Env"].append("DISPLAY")
+
         result = yield from self.manager.query("POST", "containers/create", data=params)
         self._cid = result['Id']
-        log.info("Docker container '{name}' [{id}] created".format(name=self._name, id=self._id))
+        log.info("Docker container '{name}' [{id}] {cid} created".format(name=self._name, id=self._id, cid=self._cid))
         return True
 
     def _format_env(self, variables, env):
@@ -405,8 +429,12 @@ class DockerVM(BaseNode):
         state = yield from self._get_container_state()
 
         # reset the docker container, but don't release the NIO UDP ports
-        yield from self.reset(False)
-        yield from self.create()
+        if 'labtainer' not in self._image:
+            try:
+                state = yield from self._get_container_state()
+            except DockerHttp404Error:
+                yield from self.reset(False)
+                yield from self.create()
         self.console = console
         self.aux = aux
         if state == "running":
@@ -426,6 +454,11 @@ class DockerVM(BaseNode):
         elif state == "running":
             return
         else:
+            if state == 'not_created':
+                log.debug('in start, container %s does not exist, create it ' % self._image)
+                yield from self.create()
+                log.debug('back from create')
+
             yield from self._clean_servers()
 
             yield from self.manager.query("POST", "containers/{}/start".format(self._cid))
@@ -784,14 +817,15 @@ class DockerVM(BaseNode):
                         yield from self._xvfb_process.wait()
                     except ProcessLookupError:
                         pass
-            # v – 1/True/true or 0/False/false, Remove the volumes associated to the container. Default false.
-            # force - 1/True/true or 0/False/false, Kill then remove the container. Default false.
-            try:
-                yield from self.manager.query("DELETE", "containers/{}".format(self._cid), params={"force": 1, "v": 1})
-            except DockerError:
-                pass
-            log.info("Docker container '{name}' [{image}] removed".format(
-                name=self._name, image=self._image))
+            if 'labtainer' not in self._image:
+                # v – 1/True/true or 0/False/false, Remove the volumes associated to the container. Default false.
+                # force - 1/True/true or 0/False/false, Kill then remove the container. Default false.
+                try:
+                    yield from self.manager.query("DELETE", "containers/{}".format(self._cid), params={"force": 1, "v": 1})
+                except DockerError:
+                    pass
+                log.info("Docker container '{name}' [{image}] removed".format(
+                    name=self._name, image=self._image))
 
             if release_nio_udp_ports:
                 for adapter in self._ethernet_adapters:

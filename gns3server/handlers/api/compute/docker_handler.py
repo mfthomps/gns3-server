@@ -61,6 +61,7 @@ class DockerHandler:
                                                           console_http_port=request.json.get("console_http_port", 80),
                                                           console_http_path=request.json.get("console_http_path", "/"),
                                                           aux=request.json.get("aux"),
+                                                          container_id=request.json.get("container_id"),
                                                           extra_hosts=request.json.get("extra_hosts"))
         for name, value in request.json.items():
             if name != "node_id":
