@@ -1013,7 +1013,10 @@ class Project:
                 if 'labtainer' in image:
                     container_id = node.properties['container_id']
                     results_zip = labtainersGNS3.labtainerStop(image, container_id, log)
-                    zip_list.append(results_zip)
+                    if results_zip is not None:
+                        zip_list.append(results_zip)
+                    else:
+                        log.info('stop_all got None for results_zip in image %s' % image)
             pool.append(node.stop)
         yield from pool.join()
         ''' image only used to get lab name '''
