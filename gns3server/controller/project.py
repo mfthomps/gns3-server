@@ -982,19 +982,18 @@ class Project:
         Start all nodes
         """
         pool = Pool(concurrency=3)
-        labtainer_images = {}
+        labtainer_images = []
+        for node in self.nodes.values():
+            pool.append(node.start)
+        yield from pool.join()
         for node in self.nodes.values():
             if node.node_type == 'docker':
                 image = node.properties['image']
-                log.info('node type %s %s' % (node.node_type, node.properties['image']))
                 if 'labtainer' in image:
-                    labtainer_images[image] = node.properties['container_id']
+                    labtainer_images.append(image)
 
-            pool.append(node.start)
-        yield from pool.join()
-        log.info('start_all done')
         if len(labtainer_images) > 0:
-           log.info('proj filename %s' % self._filename)
+           log.debug('proj filename %s' % self._filename)
            labtainersGNS3.labtainerTerms(labtainer_images, log)
 
 

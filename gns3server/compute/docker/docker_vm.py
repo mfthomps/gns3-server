@@ -320,7 +320,6 @@ class DockerVM(BaseNode):
 
         if image_infos is None:
             raise DockerError("Cannot get information for image '{}', please try again.".format(self._image))
-
         params = {
             "Hostname": self._name,
             "Name": self._name,
@@ -457,7 +456,6 @@ class DockerVM(BaseNode):
             if state == 'not_created':
                 log.debug('in start, container %s does not exist, create it ' % self._image)
                 yield from self.create()
-                log.debug('back from create')
 
             yield from self._clean_servers()
 
@@ -1107,3 +1105,4 @@ class DockerVM(BaseNode):
     def parameterize(self):
         log.info('parameterize: name is %s image: %s' % (self.name, self._image))
         labtainersGNS3.parameterizeOne(self._image, log)
+
