@@ -388,14 +388,31 @@ class DockerVM(BaseNode):
             if extra_hosts:
                 params["Env"].append("GNS3_EXTRA_HOSTS={}".format(extra_hosts))
 
-
         if 'labtainer' in self._image:
             params["Env"].append("DISPLAY")
+            ''' use gns3 env variable to add extra hosts, gns3 overwrites the /etc/hosts file, cannot use add-host '''
+            extra_hosts = labtainersGNS3.extraHosts(self._image, log)
+            if extra_hosts:
+                params["Env"].append("GNS3_EXTRA_HOSTS={}".format(extra_hosts))
 
         result = yield from self.manager.query("POST", "containers/create", data=params)
         self._cid = result['Id']
         log.info("Docker container '{name}' [{id}] {cid} created".format(name=self._name, id=self._id, cid=self._cid))
         return True
+
+    def broken_fix_hosts(self, extra_hosts):
+        lines = [h.strip() for h in extra_hosts.split("\n") if h.strip() != ""]
+        hosts = []
+        try:
+            for host in lines:
+                hostname, ip = host.split(":")
+                hostname = hostname.strip()
+                ip = ip.strip()
+                if hostname and ip:
+                    hosts.append((hostname, ip))
+        except ValueError:
+            raise DockerError("Can't apply `ExtraHosts`, wrong format: {}".format(extra_hosts))
+        return "\n".join(["{}\t{}".format(h[1], h[0]) for h in hosts])
 
     def _format_env(self, variables, env):
         for variable in variables:
