@@ -982,10 +982,18 @@ class Project:
         Start all nodes
         """
         pool = Pool(concurrency=3)
+        pool2 = Pool(concurrency=3)
         labtainer_images = []
         for node in self.nodes.values():
-            pool.append(node.start)
+            if node.node_type != 'docker':
+                pool.append(node.start)
         yield from pool.join()
+
+        for node in self.nodes.values():
+            if node.node_type == 'docker':
+                pool2.append(node.start)
+        yield from pool2.join()
+
         for node in self.nodes.values():
             if node.node_type == 'docker':
                 image = node.properties['image']
