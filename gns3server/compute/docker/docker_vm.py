@@ -250,8 +250,8 @@ class DockerVM(BaseNode):
             log.debug('doing X11 binds for %s' % self._image)
             #volume = volume+' --env="DISPLAY"  --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw"'
             binds.append("/tmp/.X11-unix:/tmp/.X11-unix:rw")
-            if labtainersGNS3.hasThumb(self._image, log):
-                binds.append("/dev:/dev:rw")
+            #if labtainersGNS3.hasThumb(self._image, log):
+            #    binds.append("/dev:/dev:rw")
             
 
         self._volumes = ["/etc/network"]
